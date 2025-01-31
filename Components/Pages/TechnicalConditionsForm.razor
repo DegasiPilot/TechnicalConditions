@@ -1,0 +1,288 @@
+﻿@page "/application-form"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using TechnicalConditions.Services
+
+@inject NavigationManager NavigationManager
+@inject ApplicationDbContext ApplicationDbContext
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject IDocumentService DocumentService
+
+<PageTitle>Подача заявления</PageTitle>
+
+<header style="background-color: rgb(249, 251, 250); padding: 5px;">
+	<h1 class="title">Выдача технических условий, договоров и актов подключения к инженерным сетям</h1>
+	<p>
+		Единая заявка на выдачу технических условий, договоров о подключении (технологическом присоединении),актов о подключении
+		(технологическом присоединении) объекта капитального строительства к сетям инженерно-технического обеспечения на территории РТ
+	</p>
+	<div class="row" style="margin: 15px 0;">
+		<ul style="margin: 0;">
+			<li>Рейтинг услуги</li>
+			<li>4,18</li>
+		</ul>
+		<div class="vertical-line" style="margin: 0 5px;" />
+		<ul style="margin: 0;">
+			<li>Подано заявлений</li>
+			<li>82 000</li>
+		</ul>
+	</div>
+</header>
+
+<div style="background-color: rgb(245, 245, 245); padding: 5px;">
+	<EditForm Model="application" OnValidSubmit="HandleValidSubmit" class="card">
+		<div class="card-body">
+			<DataAnnotationsValidator />
+
+			<div class="mb-3">
+				<label for="purpose" class="form-label">Цель вашего обращения</label>
+				<InputSelect id="purpose" class="form-control" @bind-Value="application.PurposeId">
+					<option value="-1">Цель вашего обращения</option>
+					@foreach (AppealPurpose purpose in purposes)
+					{
+						<option value="@purpose.Id">@purpose.Name</option>
+					}
+				</InputSelect>
+				<ValidationMessage For="(() => application.PurposeId)" />
+			</div>
+			<div class="mb-3">
+				<label for="case" class="form-label">Подходящий случай</label>
+				<InputSelect id="case" class="form-control" @bind-Value="application.CaseId">
+					<option value="-1">Случай вашего обращения</option>
+					@foreach (AppealCase caseOption in cases)
+					{
+						<option value="@caseOption.Id">@caseOption.Name</option>
+					}
+				</InputSelect>
+				<ValidationMessage For="(() => application.CaseId)" />
+			</div>
+			<div class="mb-3">
+				<label for="category" class="form-label">Категория заявителя</label>
+				<InputSelect id="category" class="form-control" @bind-Value="application.CategoryId">
+					<option value="-1">Категория заявителя</option>
+					@foreach (AppealerCategory category in categories)
+					{
+						<option value="@category.Id">@category.Name</option>
+					}
+				</InputSelect>
+				<ValidationMessage For="(() => application.CategoryId)" />
+			</div>
+			<div>
+				<label class="form-label" for="documents">Загрузить документы (максимум 2 МБ на файл, не больше 10 файлов)</label>
+				@if (!bClearInputFile)
+				{
+					<InputFile class="form-control" id="documents" OnChange="HandleFileChange" multiple />
+				}
+				@if (!string.IsNullOrEmpty(resultMessage))
+				{
+					@if(isResultError)
+					{
+						<p class="text-danger">@resultMessage</p>
+					}
+					else
+					{
+						<p class="text-success mt-3">@resultMessage</p>
+					}
+				}
+			</div>
+			<ValidationSummary class="text-danger" />
+			<div class="centerArea">
+				<CascadingAuthenticationState>
+					<AuthorizeView Context="authContext">
+						<Authorized>
+							<button type="submit" class="btn btn-primary" disabled="@isSubmitting">Отправить</button>
+						</Authorized>
+						<NotAuthorized>
+							<p>
+								<a href="@(NavigationManager.GetUriWithQueryParameters("Account/Login", new Dictionary<string, object?> { ["ReturnUrl"] = "/application-form" }))">
+									Войдите
+								</a> или <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = "/application-form" }))">
+									Зарегистрируйтесь
+								</a> чтобы отправить форму
+							</p>
+						</NotAuthorized>
+					</AuthorizeView>
+				</CascadingAuthenticationState>
+			</div>
+		</div>
+	</EditForm>
+
+	<div class="row" style="justify-content: space-around; margin: 15px 0 0 0;">
+		<div class="card" style="padding: 15px;">
+			<h2>Срок предоставления</h2>
+			<strong>5 рабочих дней</strong>
+			<p style="color: lightgray;">Максимальный срок</p>
+		</div>
+		<div class="card" style="padding: 15px;">
+			<h2>Стоимость и оплата</h2>
+			<strong style="color: green;">Бесплатно</strong>
+			<p style="color: lightgray;">Стоимость оказания услуги</p>
+		</div>
+	</div>
+	<div class="card" style="margin: 15px 2%;">
+		<div class="card-body">
+			<details>
+				<summary>Результат предоставления услуги</summary>
+				<p>Текст</p>
+			</details>
+			<hr>
+			<details>
+				<summary>Перечень необходимых документов</summary>
+				<p>Текст</p>
+			</details>
+			<hr>
+			<details>
+				<summary>Как получить услугу</summary>
+				<p>Текст</p>
+			</details>
+			<hr>
+			<details>
+				<summary>Основания для отказа</summary>
+				<p>Текст</p>
+			</details>
+		</div>
+	</div>
+</div>
+
+@code {
+	private ApplicationModel application = new ApplicationModel();
+	private bool isSubmitting = false;
+	private string? resultMessage;
+	private bool isResultError { get; set; }
+	private List<AppealPurpose> purposes { get; set; } = new();
+	private List<AppealCase> cases { get; set; } = new();
+	private List<AppealerCategory> categories { get; set; } = new();
+	private IReadOnlyList<IBrowserFile>? UploadedFiles { get; set; }
+
+	private bool bClearInputFile { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		purposes = await ApplicationDbContext.AppealPurposes.ToListAsync();
+		cases = await ApplicationDbContext.AppealCases.ToListAsync();
+		categories = await ApplicationDbContext.AppealerCategories.ToListAsync();
+	}
+
+	private async Task HandleValidSubmit()
+	{
+		if (!isSubmitting)
+		{
+			isSubmitting = true;
+			try
+			{
+				var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+				if (authState.User.Identity != null && authState.User.Identity.IsAuthenticated)
+				{
+					ApplicationUser? user = await UserManager.GetUserAsync(authState.User);
+					if (user != null)
+					{
+						Appeal appeal = new Appeal()
+							{
+								UserId = user.Id,
+								AppealerCategoryId = application.CategoryId,
+								AppealCaseId = application.CaseId,
+								AppealPurposeId = application.PurposeId,
+							};
+						ApplicationDbContext.Appeals.Add(appeal);
+						if (UploadedFiles != null)
+						{
+							foreach (IBrowserFile uploadedFile in UploadedFiles)
+							{
+								Document document = await DocumentService.UploadDocumentAsync(uploadedFile, appeal);
+								ApplicationDbContext.Documents.Add(document);
+							}
+						}
+						ApplicationDbContext.SaveChanges();
+						resultMessage = "Заявление успешно отправлено!";
+						isResultError = false;
+						ClearForm();
+					}
+					else
+					{
+						throw new UnauthorizedAccessException("Ваш аккаунт удален или недействителен! Попробуйте заново войти");
+					}
+				}
+				else
+				{
+					throw new UnauthorizedAccessException("UnAuthenticated attempt to send form");
+				}
+			}
+			catch (Exception ex)
+			{
+				resultMessage = $"Произошла ошибка: {ex.Message}";
+				isResultError = true;
+			}
+			finally
+			{
+				isSubmitting = false;
+			}
+		}
+	}
+
+	private void HandleFileChange(InputFileChangeEventArgs e)
+	{
+		try
+		{
+			UploadedFiles = e.GetMultipleFiles();
+			bool needFileNames = UploadedFiles.Count > 1;
+			resultMessage = string.Empty;
+			isResultError = false;
+			foreach (var file in UploadedFiles)
+			{
+				// Проверяем размер файла (максимум 2 МБ)
+				if (file.Size > 2 * 1024 * 1024)
+				{
+					resultMessage = "Размер файла не должен превышать 2 МБ.";
+					isResultError = true;
+					ClearInputFile();
+					return;
+				}
+
+				if (needFileNames)
+				{
+					resultMessage += $"\t{file.Name}";
+				}
+			}
+		}
+		catch (Exception exception)
+		{
+			resultMessage = "Ошибка при загрузке файлов: " + exception.Message;
+			isResultError = true;
+		}
+	}
+
+	private void ClearInputFile()
+	{
+		UploadedFiles = null;
+		bClearInputFile = true;
+		StateHasChanged();
+		bClearInputFile = false;
+		StateHasChanged();
+	}
+
+	private void ClearForm()
+	{
+		application = new ApplicationModel();
+		UploadedFiles = null;
+	}
+
+	public class ApplicationModel
+	{
+		[Required(ErrorMessage = "Выберите цель обращения")]
+		[Range(1, int.MaxValue, ErrorMessage = "Выберите цель обращения")]
+		public int PurposeId { get; set; }
+
+		[Required(ErrorMessage = "Выберите подходящий случай")]
+		[Range(1, int.MaxValue, ErrorMessage = "Выберите подходящий случай")]
+		public int CaseId { get; set; }
+
+		[Required(ErrorMessage = "Выберите категорию заявителя")]
+		[Range(1, int.MaxValue, ErrorMessage = "Выберите категорию заявителя")]
+		public int CategoryId { get; set; }
+	}
+}

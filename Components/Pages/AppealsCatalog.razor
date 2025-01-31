@@ -1,0 +1,57 @@
+﻿@page "/appeals-catalog"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using TechnicalConditions.Data
+@using TechnicalConditions.Services
+
+@attribute [Authorize(Roles = "Administrator")]
+
+@inject ApplicationDbContext DbContext
+@inject IDocumentService DocumentService
+
+<PageTitle>Список заявлений</PageTitle>
+
+<h3>Спискок заявлений</h3>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Цель обращения</th>
+            <th>Подходящий случай</th>
+            <th>Категория заявителя</th>
+            <th>Имя пользователя</th>
+            <th>Документы</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (Appeal appeal in appeals)
+        {
+            <tr>
+                <td>@appeal.AppealPurpose</td>
+                <td>@appeal.AppealCase</td>
+                <td>@appeal.AppealerCategory</td>
+                <td>@appeal.User.FirstName</td>
+                <td>
+                    @foreach(Document doc in appeal.Documents)
+                    {
+                        <a href="@(DocumentService.GetPresignedUrl(doc))" download>@doc.Name</a><br />
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Appeal> appeals = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await DbContext.AppealPurposes.ToListAsync();
+        await DbContext.AppealCases.ToListAsync();
+        await DbContext.AppealerCategories.ToListAsync();
+        await DbContext.Documents.ToListAsync(); // better perfomance then Include()
+        appeals = await DbContext.Appeals.Include(appeal => appeal.User).ToListAsync();
+    }
+}
+

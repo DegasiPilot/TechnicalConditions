@@ -1,0 +1,102 @@
+﻿@page "/profile"
+@rendermode InteractiveServer
+@using TechnicalConditions.Components.Account.Shared
+@using Microsoft.AspNetCore.Identity
+@using TechnicalConditions.Data
+@using TechnicalConditions.Helpers
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ApplicationDbContext DbContext
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Профиль</PageTitle>
+
+<div style="display: flex; flex-direction: column; align-items: center;">
+	<h3>Профиль пользователя</h3>
+	<CascadingAuthenticationState>
+		<AuthorizeView Context="authContext">
+			<Authorizing>
+				<strong>Загрузка профиля...</strong>
+			</Authorizing>
+			<Authorized>
+				@if (CurrentUser != null)
+				{
+					<p>Email: @CurrentUser?.Email</p>
+					/*<p>Тип аутентификации: @authContext.User.Identity?.AuthenticationType</p>
+					<p>Роли: @string.Join(", ", authContext.User.Claims.Where(c => c.Type == "role").Select(c => c.Value))</p>*/
+					<div class="col md-3">
+						<StatusMessage Message="@Message" IsError="@isError" />
+						<EditForm class="card" Model="CurrentUser" method="post" OnValidSubmit="UpdateUserInfo" FormName="profile">
+							<DataAnnotationsValidator />
+							<div class="card-body">
+								<div class="form-floating mb-3">
+									<InputText @bind-Value="CurrentUser!.FirstName" class="form-control" autocomplete="name" aria-required="true" placeholder="Имя" />
+									<label for="nameInput">Имя</label>
+									<ValidationMessage For="() => CurrentUser.FirstName" class="text-danger" />
+								</div>
+								<div class="mb-3">
+									<label for="birthDate" class="form-label">Дата рождения</label>
+									<InputDate id="birthDate" class="form-control" @bind-Value="CurrentUser.Birtsday" />
+								</div>
+								<div class="mb-3">
+									<label for="gender" class="form-label">Пол:</label>
+									<InputSelect @bind-Value="CurrentUser.Gender">
+										<option Value="@MaleChar">Мужской</option>
+										<option Value="@FemaleChar">Женский</option>
+									</InputSelect>
+								</div>
+								<button type="submit" class="btn btn-primary w-100">Сохранить</button>
+							</div>
+						</EditForm>
+					</div>
+				}
+				else
+				{
+					<strong>Загрузка профиля...</strong>
+				}
+			</Authorized>
+			<NotAuthorized>
+				<p>Информация о пользователе недоступна.</p>
+			</NotAuthorized>
+		</AuthorizeView>
+	</CascadingAuthenticationState>
+</div>
+
+@code {
+	private string? Message = "";
+	private bool isError;
+	private const char MaleChar = 'м';
+	private const char FemaleChar = 'ж';
+
+	[SupplyParameterFromForm]
+	private ApplicationUser? CurrentUser { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		var user = authState.User;
+
+		if (user.Identity != null && user.Identity.IsAuthenticated)
+		{
+			CurrentUser = await UserManager.GetUserAsync(user);
+		}
+	}
+
+	public async Task UpdateUserInfo(EditContext editContext)
+	{
+		if (CurrentUser != null)
+		{
+			var result = await UserManager.UpdateAsync(CurrentUser);
+			if (result.Succeeded)
+			{
+				Message = "Профиль успешно обновлен.";
+				isError = false;
+			}
+			else
+			{
+				Message = "Ошибка при обновлении профиля: " + string.Join(", ", result.Errors.Select(e => e.ToRussian()));
+				isError = true;
+			}
+		}
+	}
+}
