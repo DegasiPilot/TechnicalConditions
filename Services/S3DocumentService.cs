@@ -10,9 +10,9 @@ namespace TechnicalConditions.Services
 {
 	public class S3DocumentService : IDocumentService
 	{
-		private const string _accessKey = "O79K7G04F4JBG3CPB864";
-		private const string _secretKey = "Cn3vV6yeL6gwLvIdQ29vabZRufhlLH5bQrv4tYbI";
-		private const string _bucketName = "803e1a41-793ea7ec-6fb2-4bb2-84dd-1f48208d719d";
+		private const string _accessKey = "test";
+		private const string _secretKey = "test";
+		private const string _bucketName = "test";
 		private const string _endpointUrl = "https://s3.timeweb.cloud";
 		private static readonly AmazonS3Config _config = new AmazonS3Config()
 		{
